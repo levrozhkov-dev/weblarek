@@ -1,4 +1,4 @@
-import { IApi, IProduct, IOrder, IOrderResponse } from '../../types/index';
+import { IApi, IProductsResponse, IOrder, IOrderResponse } from '../../types/index';
 
 export class MarketApi {
   private api: IApi;
@@ -8,8 +8,8 @@ export class MarketApi {
   }
 
   // Получение массива товаров
-  getProducts(): Promise<IProduct[]> {
-    return this.api.get('/product/') as Promise<IProduct[]>;
+  getProducts(): Promise<IProductsResponse> {
+    return this.api.get('/product/') as Promise<IProductsResponse>;
   }
 
   // Создание заказа

@@ -2,6 +2,8 @@ export type ApiPostMethods = 'POST' | 'PUT' | 'DELETE';
 
 export type TPayment = 'card' | 'cash' | '';
 
+export type TValidateContext = 'payment' | 'contacts' | 'all';
+
 export interface IApi {
     get<T extends object>(uri: string): Promise<T>;
     post<T extends object>(uri: string, data: object, method?: ApiPostMethods): Promise<T>;
@@ -23,6 +25,12 @@ export interface IBuyer {
   email: string;
   phone: string;
   address: string;
+}
+
+// Интерфейс данных, получаемых с сервера
+export interface IProductsResponse {
+  total: number;
+  items: IProduct[];
 }
 
 // Данные, отправляемые на сервер при оформлении заказа

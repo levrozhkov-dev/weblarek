@@ -120,45 +120,61 @@ Presenter - презентер содержит основную логику п
 `phone: string` - номер телефона покупателя. 
 `address: string` - адрес доставки.
 
+#### Интерфейс IProductsResponse
+Интерфейс данных, получаемых с сервера.
+
+`total: number` - количество элементов.
+`items: IProduct[]` - массив элементов.
+
 ### Модели данных
 
 #### Класс Products
 Хранит полный список товаров, а также один товар для выбранной карточки.
 
-Конструктор класса не принимает параметров.
+Конструктор:
+`constructor(protected events: IEvents)` - `events` необходим для генерации событий при изменениях данных.
 
 Поля класса:  
 `products: IProduct[]` - массив всех товаров, доступных для покупки. 
 `selectedProduct: IProduct | null` - товар, выбранный для подробного отображения.
 
 Методы класса:  
-`setProducts(products: IProduct[]): void` - сохраняет массив товаров, полученного в параметрах метода. 
+`setProducts(products: IProduct[]): void` - сохраняет массив товаров, полученного в параметрах метода, и генерирует событие `products:change`. 
 `getProducts(): IProduct[]` - возвращает массив всех товаров. 
 `getProductById(id: string): IProduct` - возвращает товар по его id. 
-`setSelectedProduct(product: IProduct): void` - сохраняет товар для подробного отображения. 
+`setSelectedProduct(product: IProduct): void` - сохраняет товар для подробного отображения, , генерирует `product:selected`. 
 `getSelectedProduct(): IProduct | null` - возвращает выбранный товар для подробного отображения.
+
+События:
+`products:change` - изменение каталога.
+`product:selected` - выбран товар для просмотра.
 
 #### Класс Cart
 Хранит массив товаров, выбранных покупателем для покупки.
 
-Конструктор класса не принимает параметров.
+Конструктор:
+`constructor(protected events: IEvents)` - `events` необходим для генерации событий при изменениях данных.
 
 Поля класса:
 `items: IProduct[]` - массив товаров, добавленных пользователем в корзину.
 
 Методы класса:
 `getItems(): IProduct[]` - возвращает массив товаров, которые находятся в корзине. 
-`addItem(product: IProduct): void` - добавляет товар, который был получен в параметре, в массив корзины. 
-`removeItem(product: IProduct): void` - удаляет товар, который был получен в параметре, из массива корзины. 
-`clear(): void` - очищает корзину. 
+`addItem(product: IProduct): void` - добавляет товар, который был получен в параметре в массив корзины и генерирует `cart:change`. 
+`removeItem(product: IProduct): void` - удаляет товар, который был получен в параметре из массива корзины и генерирует `cart:change`. 
+`clear(): void` - очищает корзину и генерирует `cart:change`. 
 `getTotalPrice(): number` - возвращает общую стоимость всех товаров в корзине. 
 `getCount(): number` - возвращает количество товаров в корзине. 
 `hasItem(id: string): boolean` - проверяет наличие товара в корзине по его id.
 
+События:
+`cart:change` - изменение содержимого корзины.
+
 #### Класс Buyer
 Хранит данные покупателя и обеспечивает их валидацию.
 
-Конструктор класса не принимает параметров.
+Конструктор:
+`constructor(protected events: IEvents)` - `events` необходим для генерации событий при изменениях данных.
 
 Поля класса:
 `payment: TPayment | null` - способ оплаты. 
@@ -167,9 +183,9 @@ Presenter - презентер содержит основную логику п
 `address: string | null` - адрес доставки.
 
 Методы класса:
-`setData(data: Partial<IBuyer>): void` - сохраняет данные покупателя. Можно передать одно или несколько значений без перезаписи остальных. 
+`setData(data: Partial<IBuyer>): void` - сохраняет данные покупателя. Можно передать одно или несколько значений без перезаписи остальных. вызывает `form:update`. 
 `getData(): IBuyer` - возвращает данные покупателя. 
-`clear(): void` - очищает данные покупателя. 
+`clear(): void` - очищает данные покупателя и генерирует `form:update`. 
 `validate(): Record<string, string>` - выполняет проверку полей. Возвращает объект с ошибками, где ключи соответствуют названиям полей, а значения - тексту ошибки. Если поле прошло проверку, оно не попадает в объект. Например: `{payment: 'Не выбран вид оплаты', email: 'Укажите email',}`.
 
 ### Слой коммуникации
@@ -186,3 +202,231 @@ Presenter - презентер содержит основную логику п
 Методы:
 `getProducts(): Promise<IProduct[]>` - выполняет GET-запрос к эндпоинту /product/ и возвращает массив товаров. 
 `createOrder(order: IOrder): Promise<IOrderResponse>` - выполняет POST-запрос к эндпоинту /order/ и отправляет данные заказа.
+
+### Слой Представления (View)
+
+#### Класс Header
+Отвечает за отображение шапки сайта: счётчик корзины и кнопку открытия корзины.
+
+Конструктор:  
+`constructor(container: HTMLElement, events: EventEmitter)` - здесь `container` - корневой элемент шапки, `events` - глобальный эмиттер событий.
+
+Поля:
+`counterElement` - DOM-элемент счётчика товаров.
+`basketButton` - кнопка открытия корзины.
+
+Методы:
+`set counter(value: number)` - обновляет число товаров в корзине.
+
+События:
+`basket:open` - при клике на кнопку корзины.
+
+#### Класс Gallery
+Отображает список карточек каталога.
+
+Конструктор:  
+`constructor(container: HTMLElement)` - передается элемент.
+
+Методы:
+`set catalog(elements: HTMLElement[])` - принимает массив карточек и рендерит их в контейнер.
+
+#### Класс Card
+Базовый класс карточки товара.
+
+Конструктор:  
+`constructor(container: HTMLElement, events: EventEmitter)` - передается элемент и эмиттер.
+
+Поля:
+`titleElement` - название.
+`priceElement` - цена.
+
+Сеттеры
+`set title(value: string)` - устанавливает название.
+`set price(value: number | null)` - устанавливает цену.
+
+#### Класс CardProductBase
+Родитель для карточек каталога и предпросмотра, расширяет Card.
+
+Конструктор:  
+`constructor(container: HTMLElement, events: EventEmitter)` - передается элемент и эмиттер.
+
+Поля:
+`imageElement` - изображение.
+`categoryElement` - категория.
+
+Сеттеры
+`set image(value: string)` - подставляет изображение товара.
+`set category(value: string)` - устанавливает категорию и цветовую метку (использует `categoryMap`).
+
+#### Класс CardCatalog
+Карточка товара в списке каталога.
+
+Конструктор:  
+`constructor(container: HTMLElement, product: Product, events: EventEmitter)` - передается элемент, объект данных товара и эмиттер.
+
+События:
+`card:open` - при клике на карточку (передаётся product).
+
+#### Класс CardPreview
+Карточка товара в модальном окне предпросмотра.
+
+Конструктор:  
+`constructor(container: HTMLElement, product: Product, events: EventEmitter)` - передается элемент, объект данных товара и эмиттер.
+
+Поля:
+`descriptionElement` - DOM-элемент описания.
+`actionButton` - кнопка действия Купить / Удалить.
+
+Методы:
+`set description(value: string)` - устанавливает описание.
+`setInBasket(value: boolean)` - меняет состояние кнопки в зависимости от того, в корзине ли товар.
+`setAvailable(value: boolean)` - делает кнопку недоступной, если товар нельзя купить.
+
+События:
+`card:add-to-cart` - добавление товара.
+`card:remove-from-cart` - удаление товара.
+
+#### Класс CardBasket
+Карточка товара в корзине
+
+Конструктор:
+`constructor(container: HTMLElement, product: Product, index: number, events: EventEmitter)` - передается элемент, объект данных товара, индекс и эмиттер.
+
+Поля:
+`indexElement` - элемент номера позиции.
+`deleteButton` - кнопка удаления.
+
+События:
+`card:remove-from-cart` - при удалении товара.
+
+#### Класс Basket
+Компонент корзины.
+
+Конструктор:  
+`constructor(container: HTMLElement, events: EventEmitter)` - передается элемент и эмиттер.
+
+Поля:
+`listElement` - контейнер списка карточек.
+`totalElement` - элемент отображения суммы.
+`orderButton` - кнопка Оформить заказ.
+`emptyTextElement` - элемент Корзина пуста.
+
+Методы:
+`set items(value: HTMLElement[])` - отображает список карточек.
+`set total(value: number)` - обновляет общую сумму.
+
+События:
+`order:open` - при нажатии на кнопку оформления.
+
+#### Класс Form (базовый)
+Базовый класс форм. Управляет отправкой, ошибками и состоянием кнопки.
+
+Конструктор:
+`constructor(form: HTMLFormElement, events: EventEmitter)` - передается элемент и эмиттер.
+
+Поля:
+`form` - форма.
+`submitButton` - кнопка отправки.
+`errorElement` - место для вывода ошибок.
+
+Сеттеры:
+`set valid(value: boolean)` - включает / отключает кнопку.
+`set error(value: string)` - отображает ошибки.
+
+При `submit` эмитит событие `${form.name}:submit`.
+При `input` обновляет валидность и вызывает `form:update`.
+
+#### Класс FormPaymentType
+Форма выбора способа оплаты и ввода адреса.
+
+Конструктор:
+`constructor(form: HTMLFormElement, events: EventEmitter)` - передается элемент и эмиттер.
+
+Поля:
+`buttons` - кнопки выбора способа оплаты.
+`addressInput` - поле ввода адреса.
+
+События:
+`payment:select` - при выборе способа оплаты.
+`address:input` - при вводе адреса.
+
+#### Класс FormContacts
+Форма для контактных данных покупателя.
+
+Конструктор:
+`constructor(form: HTMLFormElement, events: EventEmitter)` - передается элемент и эмиттер.
+
+Поля:
+`emailInput` - поля ввода электронной почты.
+`phoneInput` - поля ввода номера телефона.
+
+События:
+`contacts:change` - при изменении любого поля.
+
+#### Класс Modal
+Модальное окно
+
+Конструктор:
+`constructor(container: HTMLElement, events: EventEmitter)` - передается элемент и эмиттер.
+
+Поля:
+`contentElement` - контейнер контента.
+`closeButton` - кнопка закрытия.
+
+Методы:
+`set content(value: HTMLElement)` - вставляет контент.
+`show()` - открывает модалку.
+`hide()` - закрывает модалку.
+
+События:
+`modal:close-click` - при клике вне контента или по кнопке закрытия.
+
+#### Класс Success
+Компонент, показывающий сообщение об успешном оформлении заказа.
+
+Конструктор:
+`constructor(container: HTMLElement, total: number, events: EventEmitter` - передается элемент, сумма и эмиттер.
+
+Поля:
+`descriptionElement` - текст с итоговой суммой.
+`closeButton` - кнопка закрытия.
+
+Сеттеры:
+`set total(value: number)` - обновляет отображаемую сумму.
+
+События:
+`success:close` - при закрытии окна.
+
+### События в приложении
+
+Взаимодействие между слоями Model -> View -> Presenter реализовано через брокер событий (`EventEmitter`).
+
+Ниже приведена таблица событий, которые используются в приложении.
+
+| Источник | Событие | Описание |
+|-----------|----------|-----------|
+| Products | `products:change` | Каталог товаров обновлён |
+|  | `product:selected` | Пользователь выбрал товар для просмотра |
+| Cart | `cart:change` | Изменилось содержимое корзины |
+| Buyer | `form:update` | Изменены данные формы (валидация или ввод) |
+| Header | `basket:open` | Пользователь нажал на кнопку корзины |
+| CardCatalog | `card:open` | Клик по карточке товара для открытия предпросмотра |
+| CardPreview | `card:add-to-cart` | Добавление товара в корзину |
+|  | `card:remove-from-cart` | Удаление товара из корзины |
+| CardBasket | `card:remove-from-cart` | Удаление товара из корзины (внутри корзины) |
+| Basket | `order:open` | Нажата кнопка "Оформить заказ" |
+| FormPaymentType | `payment:select` | Выбран способ оплаты |
+|  | `address:input` | Изменён адрес доставки |
+| FormContacts | `contacts:change` | Изменены поля формы контактов |
+|  | `contacts:submit` | Отправка формы контактов |
+| FormPaymentType / FormContacts | `${form.name}:submit` | Отправка формы (универсальное событие для форм) |
+| Modal | `modal:close-click` | Закрытие модального окна |
+| Success | `success:close` | Закрытие окна успешного заказа |
+
+### Презентер
+
+Презентер отражен в файле `src/vendor/main.ts`. Он связывает слои приложения, управляет состоянием и реагирует на события.
+
+1. Инициализация: Презентер получает данные от модели и передает их в представления. Он слушает события, поступающие от моделей, и вызывает соответствующие обновления в UI.
+2. Обработчики событий: Все обработчики событий находятся в презентере и направляют команды представлениям.
+3. Рендеринг: Презентер следит за состоянием модели, представления отвечают за визуальное отображение данных.
