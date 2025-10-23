@@ -12,6 +12,8 @@ import { EventEmitter } from './components/base/Events';
 import { IProduct } from './types/index';
 import { TPayment } from './types/index';
 
+import { ensureElement } from './utils/utils';
+
 import { Header } from './components/views/Header';
 import { CardCatalog } from './components/views/Card/CardCatalog';
 import { CardBasket } from './components/views/Card/CardBasket';
@@ -25,26 +27,36 @@ import { FormContacts } from './components/views/Form/FormContacts';
 
 const events = new EventEmitter();
 
+const cardCatalogTemplate = ensureElement('#card-catalog') as HTMLTemplateElement;
+const cardBasketTemplate = ensureElement('#card-basket') as HTMLTemplateElement;
+const cardPreviewTemplate = ensureElement('#card-preview') as HTMLTemplateElement;
+const orderTemplate = ensureElement('#order') as HTMLTemplateElement;
+const contactsTemplate = ensureElement('#contacts') as HTMLTemplateElement;
+
+// Экземпляры классов представления форм
+const formPayment = new FormPaymentType(events, orderTemplate.content.firstElementChild!.cloneNode(true) as HTMLFormElement);
+const formContacts = new FormContacts(events, contactsTemplate.content.firstElementChild!.cloneNode(true) as HTMLFormElement);
+
 // Модели
 const productsModel = new Products(events);
 const cart = new Cart(events);
 const buyer = new Buyer(events);
 
 // Заголовок
-const header = new Header(events, document.querySelector('.header')!);
+const header = new Header(events, ensureElement('.header')!);
 
 // Галерея каталога
-const gallery = new Gallery(document.querySelector('.gallery')!);
+const gallery = new Gallery(ensureElement('.gallery')!);
 
 // Модалка
-const modal = new Modal(events, document.querySelector('#modal-container')!);
+const modal = new Modal(events, ensureElement('#modal-container')!);
 
 // Корзина
-const basketTemplate = document.querySelector('#basket') as HTMLTemplateElement;
+const basketTemplate = ensureElement('#basket') as HTMLTemplateElement;
 const basket = new Basket(events, basketTemplate.content.firstElementChild!.cloneNode(true) as HTMLElement);
 
 // Окно успешного оформления
-const successTemplate = document.querySelector('#success') as HTMLTemplateElement;
+const successTemplate = ensureElement('#success') as HTMLTemplateElement;
 const success = new Success(events, successTemplate.content.firstElementChild!.cloneNode(true) as HTMLElement);
 
 // Работа с корзиной
@@ -61,8 +73,7 @@ events.on('card:remove-from-cart', (product: IProduct) => {
 // Рендеринг каталога
 events.on('products:change', (products: IProduct[]) => {
   const cards = products.map((product) => {
-    const cardTemplate = document.querySelector('#card-catalog') as HTMLTemplateElement;
-    const cardElement = cardTemplate.content.firstElementChild!.cloneNode(true) as HTMLElement;
+    const cardElement = cardCatalogTemplate.content.firstElementChild!.cloneNode(true) as HTMLElement;
 
     const card = new CardCatalog(cardElement, events, product);
     return card.render(product);
@@ -87,8 +98,7 @@ marketApi.getProducts()
 
 // Открытие карточки
 events.on('card:open', (product: IProduct) => {
-  const cardTemplate = document.querySelector('#card-preview') as HTMLTemplateElement;
-  const element = cardTemplate.content.firstElementChild!.cloneNode(true) as HTMLElement;
+  const element = cardPreviewTemplate.content.firstElementChild!.cloneNode(true) as HTMLElement;
 
   const isInCart = cart.hasItem(product.id);
 
@@ -106,7 +116,12 @@ events.on('card:open', (product: IProduct) => {
   card.setAvailable(product.price !== null);
   card.setInBasket(isInCart);
 
-  modal.content = card.render(product);
+  events.emit('modal:open', card.render(product))
+});
+
+// Открытие модалки
+events.on('modal:open', (content: HTMLElement) => {
+  modal.content = content;
   modal.show();
   document.body.style.overflow = 'hidden';
 });
@@ -122,8 +137,7 @@ events.on('cart:change', (items: IProduct[]) => {
   header.counter = cart.getItems().length;
 
   const basketCards = items.map((product, index) => {
-    const cardTemplate = document.querySelector('#card-basket') as HTMLTemplateElement;
-    const element = cardTemplate.content.firstElementChild!.cloneNode(true) as HTMLElement;
+    const element = cardBasketTemplate.content.firstElementChild!.cloneNode(true) as HTMLElement;
 
     const card = new CardBasket(element as HTMLElement, {
       onDelete: () => events.emit('card:remove-from-cart', product)
@@ -136,7 +150,7 @@ events.on('cart:change', (items: IProduct[]) => {
   basket.items = basketCards;
 
   // Общая сумма
-  const total = items.reduce((sum, item) => sum + (item.price || 0), 0);
+  const total = cart.getTotalPrice();
   basket.total = total;
 
   console.log('Корзина изменена:', items);
@@ -144,93 +158,77 @@ events.on('cart:change', (items: IProduct[]) => {
 
 // Открытие корзины
 events.on('basket:open', () => {
-  modal.content = basket.render();
-  modal.show();
-  document.body.style.overflow = 'hidden';
+  events.emit('modal:open', basket.render());
 });
 
 
 // Открытие формы
 events.on('order:open', () => {
-  const orderTemplate = document.querySelector('#order') as HTMLTemplateElement;
   const formElement = orderTemplate.content.firstElementChild!.cloneNode(true) as HTMLFormElement;
-  const formPayment = new FormPaymentType(events, formElement);
 
   buyer.clear();
 
-  modal.content = formPayment.render({});
+  events.emit('modal:open', formPayment.render());
   formPayment.valid = false;
-  modal.show();
-  document.body.style.overflow = 'hidden';
 });
 
 // Выбор способа оплаты
 events.on('payment:select', (data: { payment: string }) => {
   buyer.setData({ payment: data.payment as TPayment }, 'payment');
+  const errors = buyer.validate('payment');
+  events.emit('form:update', { valid: Object.keys(errors).length === 0, errors });
 });
 
 // Ввод адреса
 events.on('address:input', (data: { address: string }) => {
   buyer.setData({ address: data.address }, 'payment');
+  const errors = buyer.validate('payment');
+  events.emit('form:update', { valid: Object.keys(errors).length === 0, errors });
 });
 
-// Сабмит формы
+// Сабмит формы оплаты
 events.on('order:submit', () => {
-  const errors = buyer.validate('payment');
-  if (Object.keys(errors).length === 0) {
-    const contactsTemplate = document.querySelector('#contacts') as HTMLTemplateElement;
-    const formElement = contactsTemplate.content.firstElementChild!.cloneNode(true) as HTMLFormElement;
-    const formContacts = new FormContacts(events, formElement);
-
-    modal.content = formContacts.render({});
-    modal.show();
-    document.body.style.overflow = 'hidden';
-  }
+  events.emit('modal:open', formContacts.render());
 });
 
 // Изменение контактов
 events.on('contacts:change', (data: { email?: string; phone?: string }) => {
   buyer.setData(data, 'contacts');
+  const errors = buyer.validate('contacts');
+  events.emit('form:update', { valid: Object.keys(errors).length === 0, errors });
 });
 
 // Сабмит контактов
 events.on('contacts:submit', () => {
-  const errors = buyer.validate();
-  if (Object.keys(errors).length === 0) {
-    // Формируем объект заказа
-    const buyerData = buyer.getData();
-    const order = {
-      items: cart.getItems().map(item => item.id),
-      payment: buyerData.payment!,
-      address: buyerData.address!,
-      email: buyerData.email!,
-      phone: buyerData.phone!,
-      total: cart.getTotalPrice()
-    };
+  const buyerData = buyer.getData();
+  const order = {
+    items: cart.getItems().map(item => item.id),
+    payment: buyerData.payment!,
+    address: buyerData.address!,
+    email: buyerData.email!,
+    phone: buyerData.phone!,
+    total: cart.getTotalPrice()
+  };
 
-    // Отправляем заказ на сервер
-    marketApi.createOrder(order)
-      .then((response) => {
-        const total = response.total || cart.getTotalPrice();
-        modal.content = success.render({ total });
-        modal.show();
-        document.body.style.overflow = 'hidden';
+  // Отправляем заказ на сервер
+  marketApi.createOrder(order)
+    .then((response) => {
+      const total = response.total || cart.getTotalPrice();
+      events.emit('modal:open', success.render({ total })); 
 
-        cart.clear();
-        buyer.clear();
+      cart.clear();
+      buyer.clear();
 
-        console.log('Заказ успешно создан:', response);
-      })
-      .catch((error) => {
-        console.error('Ошибка при создании заказа:', error);
-      });
-  }
+      console.log('Заказ успешно создан:', response);
+    })
+    .catch((error) => {
+      console.error('Ошибка при создании заказа:', error);
+    });
 });
 
 // Закрытие окна успешного оформления
 events.on('success:close', () => {
-  modal.hide();
-  document.body.style.overflow = 'auto';
+  events.emit('modal:close-click'); 
 });
 
 // Логи обновлений форм
