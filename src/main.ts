@@ -164,12 +164,9 @@ events.on('basket:open', () => {
 
 // Открытие формы
 events.on('order:open', () => {
-  const formElement = orderTemplate.content.firstElementChild!.cloneNode(true) as HTMLFormElement;
-
   buyer.clear();
-
+  formPayment.reset();
   events.emit('modal:open', formPayment.render());
-  formPayment.valid = false;
 });
 
 // Выбор способа оплаты
@@ -188,6 +185,7 @@ events.on('address:input', (data: { address: string }) => {
 
 // Сабмит формы оплаты
 events.on('order:submit', () => {
+  formContacts.reset();
   events.emit('modal:open', formContacts.render());
 });
 

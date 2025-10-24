@@ -29,4 +29,9 @@ export class FormPaymentType extends Form<IPaymentForm> {
       this.events.emit('address:input', { address: this.addressInput.value });
     });
   }
+
+  reset() {
+    super.reset();
+    this.buttons.forEach((b) => b.classList.remove('button_alt-active'));
+  }
 }
